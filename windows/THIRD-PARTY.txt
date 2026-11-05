@@ -1,0 +1,34 @@
+FreeX Desktop for Windows - third-party software
+=================================================
+
+FreeX Desktop itself is free software under the GNU Lesser General Public
+License v3.0 (see LICENSE.txt). The installer also contains the following
+programs and components. Each keeps its own license.
+
+mpv, folder "mpv"
+    A separate program that FreeX Desktop starts to play videos.
+    Build: official Windows release build of the mpv project (x86_64-w64-mingw32)
+    License: GNU General Public License v2.0 or later (this build contains GPL
+    components), see https://github.com/mpv-player/mpv/blob/master/Copyright.
+    The build also contains FFmpeg, libass, libplacebo and further libraries
+    under their own (LGPL, BSD, MIT, ISC) licenses.
+    Project and source code: https://mpv.io and https://github.com/mpv-player/mpv
+    You may replace the mpv folder with another build of mpv.
+
+WebView2Loader.dll
+    Part of the Microsoft Edge WebView2 SDK; loads the WebView2 Runtime.
+    License: BSD-style license of the WebView2 SDK, Copyright (C) Microsoft
+    Corporation, https://www.nuget.org/packages/Microsoft.Web.WebView2
+
+Microsoft Edge WebView2 Runtime
+    Not part of FreeX Desktop. If it is missing, the installer runs Microsoft's
+    bootstrapper (MicrosoftEdgeWebview2Setup.exe), which downloads and installs it
+    under Microsoft's license terms.
+    https://developer.microsoft.com/microsoft-edge/webview2/
+
+Tauri (https://tauri.app), MIT License or Apache License 2.0, and the Rust
+libraries it is built with, under their own (MIT, Apache 2.0, BSD, ISC, Zlib or
+Unicode) licenses. The list with all licenses is in the source repository:
+https://github.com/LinzN/freex-desktop
+
+The server picker contains the font Manrope (SIL Open Font License 1.1).

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-show-servers"
+description = "Enables the show_servers command without any pre-configured scope."
+commands.allow = ["show_servers"]
+
+[[permission]]
+identifier = "deny-show-servers"
+description = "Denies the show_servers command without any pre-configured scope."
+commands.deny = ["show_servers"]

@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local",
+  "description": "The bundled server picker. Pages of a FreeX server get their own, smaller capability at runtime (see server.rs).",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-servers-list",
+    "allow-server-probe",
+    "allow-server-open",
+    "allow-server-remove",
+    "allow-set-auto-connect",
+    "allow-desktop-info",
+    "allow-set-player"
+  ]
+}

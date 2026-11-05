@@ -1,0 +1,383 @@
+/*
+ * Copyright (c) 2026 MirraNET, Niklas Linz. All rights reserved.
+ *
+ * This file is part of the MirraNET project and is licensed under the
+ * GNU Lesser General Public License v3.0 (LGPLv3).
+ *
+ * You may use, distribute and modify this code under the terms
+ * of the LGPLv3 license. You should have received a copy of the
+ * license along with this file. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>
+ * or contact: niklas.linz@mirranet.de
+ */
+
+/* Server picker of FreeX Desktop; colors and type follow FreeX Web. */
+
+@font-face {
+    font-family: "Manrope";
+    src: url("manrope.woff2") format("woff2");
+    font-weight: 200 800;
+    font-display: swap;
+}
+
+:root {
+    --ink: #121821;
+    --surface: #1b2430;
+    --raised: #243042;
+    --line: #2e3b4e;
+    --text: #e8edf2;
+    --muted: #8a97a8;
+    --glass: #f0974a;
+    --brand-red: #d93b42;
+    --brand-amber: #f4b75c;
+    --glass-ink: #2a1306;
+    --danger: #e26d5a;
+    --font: "Manrope", system-ui, "Segoe UI", sans-serif;
+    color-scheme: dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    background: radial-gradient(ellipse at 50% -10%, #213046 0, var(--ink) 62%) var(--ink) fixed;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+button, input, select {
+    font: inherit;
+    color: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+:focus-visible {
+    outline: 2px solid var(--glass);
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.muted, .hint {
+    color: var(--muted);
+}
+
+.hint {
+    font-size: 13px;
+}
+
+.picker {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 48px 20px 28px;
+    display: grid;
+    gap: 18px;
+}
+
+/* ---------------------------------------------------------------- brand */
+
+.brand {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.brand img {
+    width: 104px;
+    height: 104px;
+}
+
+.brand .word {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(90deg, var(--brand-red), var(--brand-amber));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.brand .word b {
+    font-weight: 500;
+}
+
+.brand .slogan {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, .35);
+}
+
+.card h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+}
+
+.card h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+}
+
+.card > p {
+    margin: 0 0 18px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--raised);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.btn:hover {
+    border-color: #3d4d64;
+}
+
+.btn.primary {
+    background: var(--glass);
+    border-color: var(--glass);
+    color: var(--glass-ink);
+}
+
+.btn.primary:hover {
+    background: #f6ad6a;
+}
+
+.error {
+    background: rgba(226, 109, 90, .12);
+    border: 1px solid rgba(226, 109, 90, .45);
+    color: #f3b0a5;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+/* ---------------------------------------------------------------- server list */
+
+.servers {
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.servers li {
+    position: relative;
+}
+
+.server {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 44px 10px 10px;
+    text-align: left;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--ink);
+}
+
+.server:hover {
+    border-color: var(--glass);
+}
+
+.server-icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    font-weight: 800;
+    color: var(--glass-ink);
+    background: linear-gradient(135deg, var(--brand-red), var(--brand-amber));
+}
+
+.server-text {
+    display: grid;
+    min-width: 0;
+}
+
+.server-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.server-url, .server-when {
+    color: var(--muted);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remove {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1;
+}
+
+.remove:hover {
+    background: var(--raised);
+    color: var(--danger);
+}
+
+.found {
+    width: 100%;
+    margin-bottom: 18px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px dashed var(--glass);
+    background: rgba(240, 151, 74, .08);
+    color: var(--brand-amber);
+    font-weight: 700;
+    text-align: left;
+}
+
+/* ---------------------------------------------------------------- form */
+
+form label, .field > label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+input[type="text"], select {
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--ink);
+    user-select: text;
+}
+
+input[type="text"] {
+    flex: 1;
+    min-width: 0;
+}
+
+input[type="text"]:focus, select:focus {
+    border-color: var(--glass);
+    outline: none;
+}
+
+select {
+    width: 100%;
+}
+
+.field {
+    margin: 16px 0 0;
+}
+
+.field .hint {
+    margin-top: 6px;
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.check + .check, .field + .check {
+    margin-top: 14px;
+}
+
+.check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--glass);
+}
+
+.settings {
+    padding: 18px 24px;
+    box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- connecting */
+
+.connecting {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.connecting-title {
+    font-weight: 700;
+    font-size: 17px;
+}
+
+.spin {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 3px solid var(--line);
+    border-top-color: var(--glass);
+    animation: spin .8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+footer {
+    text-align: center;
+    font-size: 12px;
+}

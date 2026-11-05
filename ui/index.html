@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  ~ Copyright (c) 2026 MirraNET, Niklas Linz. All rights reserved.
+  ~
+  ~ This file is part of the MirraNET project and is licensed under the
+  ~ GNU Lesser General Public License v3.0 (LGPLv3).
+  ~
+  ~ You may use, distribute and modify this code under the terms
+  ~ of the LGPLv3 license. You should have received a copy of the
+  ~ license along with this file. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>
+  ~ or contact: niklas.linz@mirranet.de
+  -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FreeX</title>
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<main class="picker">
+    <div class="brand">
+        <img src="logo.svg" alt="">
+        <div class="word">Free<b>X</b></div>
+        <div class="slogan">Your Media. Your Server. Your Freedom.</div>
+    </div>
+
+    <section class="card" id="connecting" hidden>
+        <div class="connecting">
+            <span class="spin"></span>
+            <div>
+                <div class="connecting-title" id="connecting-title"></div>
+                <div class="muted" id="connecting-url"></div>
+            </div>
+        </div>
+        <button class="btn" id="cancel" type="button" data-t="Cancel"></button>
+    </section>
+
+    <section class="card" id="choose" hidden>
+        <h1 data-t="Choose a server"></h1>
+        <p class="muted" id="choose-intro"></p>
+        <div class="error" id="error" role="alert" hidden></div>
+        <ul class="servers" id="servers"></ul>
+        <button class="found" id="found" type="button" hidden></button>
+        <form id="add" autocomplete="off">
+            <label for="address" data-t="Add a server"></label>
+            <div class="row">
+                <input id="address" type="text" spellcheck="false" required>
+                <button class="btn primary" id="connect" type="submit" data-t="Connect"></button>
+            </div>
+            <div class="hint" data-t="The address of your FreeX Media Server, for example 192.168.1.10, nas:32500 or https://media.example.org."></div>
+        </form>
+    </section>
+
+    <section class="card settings" id="settings" hidden>
+        <h2 data-t="App settings"></h2>
+        <label class="check">
+            <input type="checkbox" id="auto-connect">
+            <span data-t="Connect to the last server on start"></span>
+        </label>
+        <div class="field">
+            <label for="player" data-t="Play videos with"></label>
+            <select id="player">
+                <option value="builtin" data-t="FreeX player"></option>
+                <option value="mpv" data-t="mpv (plays every file directly)"></option>
+            </select>
+            <div class="hint" id="player-hint"></div>
+        </div>
+        <label class="check" id="mpv-fs-row">
+            <input type="checkbox" id="mpv-fullscreen">
+            <span data-t="Start mpv in full screen"></span>
+        </label>
+    </section>
+
+    <footer class="muted" id="version"></footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

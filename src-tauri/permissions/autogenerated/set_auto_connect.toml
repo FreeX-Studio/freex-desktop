@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-auto-connect"
+description = "Enables the set_auto_connect command without any pre-configured scope."
+commands.allow = ["set_auto_connect"]
+
+[[permission]]
+identifier = "deny-set-auto-connect"
+description = "Denies the set_auto_connect command without any pre-configured scope."
+commands.deny = ["set_auto_connect"]
