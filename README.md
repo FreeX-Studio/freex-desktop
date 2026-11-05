@@ -66,7 +66,7 @@ The app is built with [Tauri 2](https://tauri.app) (Rust) and cross-compiled on 
 Jenkins as the server:
 
 ```bash
-sudo apt install gcc-mingw-w64-x86-64 nsis curl unzip
+sudo apt install build-essential gcc-mingw-w64-x86-64 nsis curl unzip
 rustup target add x86_64-pc-windows-gnu
 windows/build.sh            # dist/freex-desktop-<version>-setup.exe
 windows/build.sh --app      # only dist/freex-desktop.exe

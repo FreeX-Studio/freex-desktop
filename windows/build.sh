@@ -17,7 +17,8 @@
 #   windows/build.sh --app      only the app (dist/freex-desktop.exe)
 #
 # Needs: cargo (Rust 1.90+), the Rust target x86_64-pc-windows-gnu (rustup target add
-# x86_64-pc-windows-gnu), gcc-mingw-w64-x86-64, nsis, curl, unzip, sha256sum.
+# x86_64-pc-windows-gnu), a C compiler for Linux (build-essential: build scripts and macros run
+# on the build machine), gcc-mingw-w64-x86-64, nsis, curl, unzip, sha256sum.
 # A toolchain without the Windows standard library but with rust-src (e.g. the Ubuntu packages
 # rustc-1.91 and rust-1.91-src) also works: the standard library is then built from source.
 #
@@ -52,7 +53,7 @@ need() {
 
 # ------------------------------------------------------------------ the app
 
-need cargo rustc x86_64-w64-mingw32-gcc
+need cargo rustc cc x86_64-w64-mingw32-gcc
 VERSION="$(sed -n 's/^version *= *"\(.*\)"/\1/p' "$ROOT/src-tauri/Cargo.toml" | head -1)"
 
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc
