@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) 2026 MirraNET, Niklas Linz. Licensed under the GNU LGPLv3. -->
+<!-- AppStream data: lets software centres (GNOME Software, Discover) show FreeX Desktop. -->
+<component type="desktop-application">
+  <id>de.mirranet.freex.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-3.0-only</project_license>
+  <name>FreeX</name>
+  <summary>Watch the movies and shows of your FreeX Media Server</summary>
+  <summary xml:lang="de">Filme und Serien von deinem FreeX Media Server ansehen</summary>
+  <developer id="de.mirranet">
+    <name>MirraNET</name>
+  </developer>
+  <description>
+    <p>
+      FreeX Desktop is the desktop app for FreeX Media Server. Your Media. Your Server. Your Freedom.
+    </p>
+    <ul>
+      <li>All your servers in one place, also in the tray menu</li>
+      <li>Plays every file directly in mpv, inside the app window, without conversion on the server</li>
+      <li>Media keys, real full screen and remembered window size</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">freex-desktop.desktop</launchable>
+  <url type="homepage">https://github.com/FreeX-Studio/freex-desktop</url>
+  <url type="bugtracker">https://github.com/FreeX-Studio/freex-desktop/issues</url>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+  <releases>
+    <release version="[[version]]" date="[[date]]"/>
+  </releases>
+</component>

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mpv-key"
+description = "Enables the mpv_key command without any pre-configured scope."
+commands.allow = ["mpv_key"]
+
+[[permission]]
+identifier = "deny-mpv-key"
+description = "Denies the mpv_key command without any pre-configured scope."
+commands.deny = ["mpv_key"]

@@ -16,7 +16,7 @@
 //! The main window shows either the bundled server picker (`ui/`) or FreeX Web, loaded directly
 //! from the chosen server. Pages of a server only get a small runtime capability for their own
 //! origin (see [`grant`]): they can ask for app info, switch the player, go back to the picker,
-//! hand a video to mpv and make the window full screen. Nothing else of the app is reachable
+//! hand a video (and key presses) to mpv and make the window full screen. Nothing else of the app is reachable
 //! from there.
 
 use crate::mpv;
@@ -39,6 +39,8 @@ pub struct AppState {
     granted: Mutex<HashSet<String>>,
     /// URL of the bundled picker (`tauri://localhost/` or `http://tauri.localhost/`).
     pub local_url: Mutex<Option<Url>>,
+    /// Id of the server shown in the window; none while the picker is shown.
+    open_server: Mutex<Option<String>>,
     pub mpv: mpv::Mpv,
 }
 
@@ -49,6 +51,7 @@ impl AppState {
             settings_path,
             granted: Mutex::new(HashSet::new()),
             local_url: Mutex::new(None),
+            open_server: Mutex::new(None),
             mpv: mpv::Mpv::default(),
         }
     }
@@ -61,13 +64,22 @@ impl AppState {
         result
     }
 
+    /// Id of the server shown in the window, if any.
+    pub fn current_server(&self) -> Option<String> {
+        self.open_server.lock().unwrap().clone()
+    }
+
     /// True if the URL may be shown in the main window: the picker or a known server.
     pub fn allowed_in_window(&self, url: &Url) -> bool {
         if is_local(url) {
             return true;
         }
         let origin = origin(url);
-        self.settings.lock().unwrap().server_by_origin(&origin).is_some()
+        self.settings
+            .lock()
+            .unwrap()
+            .server_by_origin(&origin)
+            .is_some()
     }
 }
 
@@ -142,7 +154,12 @@ fn ask(agent: &ureq::Agent, base: &Url) -> Option<Probe> {
         .and_then(|v| v.as_str())
         .unwrap_or_default()
         .to_string();
-    Some(Probe { url: origin(&final_url), name, setup_required, version })
+    Some(Probe {
+        url: origin(&final_url),
+        name,
+        setup_required,
+        version,
+    })
 }
 
 /// Finds the FreeX Media Server behind what the user typed (`nas`, `192.168.1.10:32500`,
@@ -182,6 +199,7 @@ fn grant<R: Runtime>(app: &AppHandle<R>, state: &AppState, origin: &str) -> Resu
         .permission("allow-set-player")
         .permission("allow-mpv-play")
         .permission("allow-mpv-stop")
+        .permission("allow-mpv-key")
         .permission("core:event:allow-listen")
         .permission("core:event:allow-unlisten")
         .permission("core:window:allow-set-fullscreen")
@@ -204,13 +222,15 @@ pub fn server_open<R: Runtime>(
         return Err("invalid".into());
     }
     let origin = origin(&parsed);
-    state.update(|s| s.remember(&origin, &name));
+    let server = state.update(|s| s.remember(&origin, &name));
     grant(&app, &state, &origin)?;
     let window = app.get_webview_window("main").ok_or("no window")?;
     window
         .navigate(Url::parse(&format!("{origin}/")).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     let _ = window.set_title(&format!("{name} – FreeX"));
+    *state.open_server.lock().unwrap() = Some(server.id);
+    crate::refresh_tray(&app);
     Ok(())
 }
 
@@ -233,8 +253,9 @@ pub fn servers_list(state: State<'_, AppState>) -> ServerList {
 }
 
 #[tauri::command]
-pub fn server_remove(state: State<'_, AppState>, id: String) {
+pub fn server_remove<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, id: String) {
     state.update(|s| s.forget(&id));
+    crate::refresh_tray(&app);
 }
 
 #[tauri::command]
@@ -244,17 +265,50 @@ pub fn set_auto_connect(state: State<'_, AppState>, enabled: bool) {
 
 /// Goes back to the server picker, which then does not connect automatically.
 #[tauri::command]
-pub fn show_servers<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<(), String> {
+pub fn show_servers<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     state.mpv.stop();
-    open_picker(&app, &state)
+    open_picker(&app, &state, None)
 }
 
-pub fn open_picker<R: Runtime>(app: &AppHandle<R>, state: &AppState) -> Result<(), String> {
+/// Shows the server picker; with `connect` (a server id) it connects to that server at once.
+pub fn open_picker<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+    connect: Option<&str>,
+) -> Result<(), String> {
     let window = app.get_webview_window("main").ok_or("no window")?;
-    let local = state.local_url.lock().unwrap().clone().ok_or("no picker")?;
-    let url = local.join("index.html?pick=1").map_err(|e| e.to_string())?;
+    let url = picker_url(state.local_url.lock().unwrap().as_ref(), connect);
     let _ = window.set_title("FreeX");
-    window.navigate(url).map_err(|e| e.to_string())
+    window.navigate(url).map_err(|e| e.to_string())?;
+    *state.open_server.lock().unwrap() = None;
+    crate::refresh_tray(app);
+    Ok(())
+}
+
+/// Where Tauri serves the bundled pages when the window's own URL is not known.
+const LOCAL_ORIGIN: &str = if cfg!(any(windows, target_os = "android")) {
+    "http://tauri.localhost/"
+} else {
+    "tauri://localhost/"
+};
+
+/// URL of the picker in "choose" mode, optionally connecting to a server at once. `seen` is the
+/// URL the window started with; it is only used if it really is one of the app's own pages
+/// (right after the window was created, WebView2 may still report `about:blank`).
+fn picker_url(seen: Option<&Url>, connect: Option<&str>) -> Url {
+    let base = seen
+        .filter(|u| is_local(u))
+        .cloned()
+        .unwrap_or_else(|| Url::parse(LOCAL_ORIGIN).expect("valid local origin"));
+    let mut url = base.join("/index.html").expect("valid picker path");
+    url.query_pairs_mut().append_pair("pick", "1");
+    if let Some(id) = connect {
+        url.query_pairs_mut().append_pair("connect", id);
+    }
+    url
 }
 
 // ---------------------------------------------------------------------------- app info
@@ -268,12 +322,21 @@ pub struct DesktopInfo {
     player: Player,
     mpv_available: bool,
     mpv_fullscreen: bool,
+    /// mpv plays inside the app window (setting).
+    mpv_embed: bool,
+    /// The system allows mpv inside the app window (not on Wayland).
+    mpv_can_embed: bool,
     /// The server the asking page belongs to (none for the picker).
     server: Option<Server>,
 }
 
 #[tauri::command]
-pub fn desktop_info<R: Runtime>(webview: Webview<R>, state: State<'_, AppState>) -> DesktopInfo {
+pub fn desktop_info<R: Runtime>(
+    app: AppHandle<R>,
+    webview: Webview<R>,
+    state: State<'_, AppState>,
+) -> DesktopInfo {
+    let mpv_can_embed = mpv::can_embed(&app);
     let settings = state.settings.lock().unwrap();
     let server = webview
         .url()
@@ -287,34 +350,65 @@ pub fn desktop_info<R: Runtime>(webview: Webview<R>, state: State<'_, AppState>)
         player: settings.player,
         mpv_available: mpv::find().is_some(),
         mpv_fullscreen: settings.mpv_fullscreen,
+        mpv_embed: settings.mpv_embed,
+        mpv_can_embed,
         server,
     }
 }
 
-/// Chooses the player for videos; `mpv_fullscreen` is optional.
+/// Chooses the player for videos; `mpv_fullscreen` and `mpv_embed` are optional.
 #[tauri::command]
-pub fn set_player(state: State<'_, AppState>, player: Player, mpv_fullscreen: Option<bool>) {
+pub fn set_player(
+    state: State<'_, AppState>,
+    player: Player,
+    mpv_fullscreen: Option<bool>,
+    mpv_embed: Option<bool>,
+) {
     state.update(|s| {
         s.player = player;
         if let Some(fs) = mpv_fullscreen {
             s.mpv_fullscreen = fs;
+        }
+        if let Some(embed) = mpv_embed {
+            s.mpv_embed = embed;
         }
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::candidates;
+    use super::{candidates, picker_url, LOCAL_ORIGIN};
+    use tauri::Url;
+
+    #[test]
+    fn picker_url_ignores_a_window_url_that_is_not_the_app() {
+        let blank = Url::parse("about:blank").unwrap();
+        let expected = format!("{LOCAL_ORIGIN}index.html?pick=1");
+        assert_eq!(picker_url(Some(&blank), None).as_str(), expected);
+        assert_eq!(picker_url(None, None).as_str(), expected);
+        let seen = Url::parse("http://tauri.localhost/index.html").unwrap();
+        assert_eq!(
+            picker_url(Some(&seen), Some("00ff")).as_str(),
+            "http://tauri.localhost/index.html?pick=1&connect=00ff"
+        );
+    }
 
     #[test]
     fn candidates_for_a_host_name_try_the_default_port_first() {
-        let c: Vec<String> = candidates("nas").unwrap().iter().map(|u| u.to_string()).collect();
+        let c: Vec<String> = candidates("nas")
+            .unwrap()
+            .iter()
+            .map(|u| u.to_string())
+            .collect();
         assert_eq!(c, ["http://nas:32500/", "https://nas/", "http://nas/"]);
     }
 
     #[test]
     fn candidates_keep_an_explicit_port_or_scheme() {
-        assert_eq!(candidates("10.0.0.2:8080").unwrap()[0].as_str(), "http://10.0.0.2:8080/");
+        assert_eq!(
+            candidates("10.0.0.2:8080").unwrap()[0].as_str(),
+            "http://10.0.0.2:8080/"
+        );
         assert_eq!(candidates(" https://media.example.org/ ").unwrap().len(), 1);
         assert!(candidates("ftp://x").is_err());
         assert!(candidates("").is_err());

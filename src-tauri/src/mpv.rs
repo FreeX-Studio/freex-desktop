@@ -13,11 +13,19 @@
 //! Playback in mpv.
 //!
 //! mpv plays practically every file directly, so the server never has to convert anything for
-//! the desktop app. FreeX Web hands over the stream URL with [`mpv_play`]; the app starts mpv in
-//! its own window and talks to it over mpv's JSON IPC (a named pipe on Windows, a Unix socket
-//! elsewhere). The sign-in token is sent over that pipe, never on the command line. Position
-//! changes and the end of playback come back to the page as `freex-mpv` events, and FreeX Web
-//! saves the position on the server just as with its own player.
+//! the desktop app. FreeX Web hands over the stream URL with [`mpv_play`]; the app starts mpv and
+//! talks to it over mpv's JSON IPC (a named pipe on Windows, a Unix socket elsewhere). The
+//! sign-in token is sent over that pipe, never on the command line. Position changes and the end
+//! of playback come back to the page as `freex-mpv` events, and FreeX Web saves the position on
+//! the server just as with its own player.
+//!
+//! Where the platform allows it (Windows, Linux on X11), mpv draws into the app's own window
+//! (`--wid`), so the video plays inside FreeX like in a native player. mpv's full screen is then
+//! the full screen of the app window, and Esc first leaves full screen and then stops. The
+//! keyboard stays with the web view (GTK keeps the X11 focus on its own window), so the page
+//! hands key presses to mpv while it plays there ([`mpv_key`], see `native.js`). On
+//! Wayland, which cannot embed a foreign window, and when turned off in the settings, mpv opens
+//! its own window as before.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -25,7 +33,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Runtime, State, Url, Webview};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State, Url, Webview};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
 
@@ -55,6 +63,13 @@ impl Mpv {
         }
     }
 
+    /// Sends a command to the running mpv, if any.
+    fn send(&self, command: Value) {
+        if let Some(running) = self.current.lock().unwrap().as_ref() {
+            let _ = running.commands.send(command);
+        }
+    }
+
     fn finished(&self, id: u64) {
         let mut current = self.current.lock().unwrap();
         if current.as_ref().map(|r| r.id) == Some(id) {
@@ -75,6 +90,25 @@ pub fn find() -> Option<PathBuf> {
     std::env::split_paths(&std::env::var_os("PATH")?)
         .map(|dir| dir.join(exe))
         .find(|p| p.is_file())
+}
+
+/// Native handle of the app window that mpv can draw into (`--wid`): a Win32 window or an X11
+/// window. `None` on Wayland (no embedding of foreign windows) and other platforms.
+fn embed_target<R: Runtime>(app: &AppHandle<R>) -> Option<i64> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let window = app.get_webview_window("main")?;
+    let handle = window.window_handle().ok()?;
+    match handle.as_raw() {
+        RawWindowHandle::Win32(h) => Some(h.hwnd.get() as i64),
+        RawWindowHandle::Xlib(h) => i64::try_from(h.window).ok(),
+        RawWindowHandle::Xcb(h) => Some(i64::from(h.window.get())),
+        _ => None,
+    }
+}
+
+/// True if mpv can draw into the app window on this system.
+pub fn can_embed<R: Runtime>(app: &AppHandle<R>) -> bool {
+    embed_target(app).is_some()
 }
 
 /// What FreeX Web asks to play.
@@ -146,40 +180,42 @@ pub async fn mpv_play<R: Runtime>(
 
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let ipc = ipc_path(id);
-    let fullscreen = state.settings.lock().unwrap().mpv_fullscreen;
+    let (fullscreen, embed) = {
+        let settings = state.settings.lock().unwrap();
+        (settings.mpv_fullscreen, settings.mpv_embed)
+    };
+    let wid = if embed { embed_target(&app) } else { None };
+    let window = app.get_webview_window("main");
+    // Embedded, mpv's full screen is the app window's: remember how it was to restore it, and
+    // keep a window that is already full screen that way.
+    let embedded = match (&window, wid) {
+        (Some(w), Some(_)) => Some(Embedded {
+            window_was_fullscreen: w.is_fullscreen().unwrap_or(false),
+        }),
+        _ => None,
+    };
+    let fullscreen = fullscreen || embedded.as_ref().is_some_and(|e| e.window_was_fullscreen);
+    if let (Some(w), Some(_), true) = (&window, &embedded, fullscreen) {
+        let _ = w.set_fullscreen(true);
+    }
 
     let mut cmd = tokio::process::Command::new(&mpv);
-    cmd.arg(format!("--input-ipc-server={ipc}"))
-        .arg("--idle=once") // quit when the file is done
-        .arg("--force-window=immediate")
-        .arg("--keep-open=no")
-        .arg("--no-terminal")
-        .arg("--ytdl=no")
-        .arg("--hwdec=auto-safe")
-        .arg("--save-position-on-quit=no") // FreeX keeps the position
-        .arg(format!("--force-media-title={}", request.title))
-        .arg(format!("--start={:.3}", request.start_ms as f64 / 1000.0))
-        .arg(match request.audio {
-            Some(a) => format!("--aid={a}"),
-            None => "--aid=auto".into(),
-        })
-        .arg(match request.subtitle {
-            Some(s) => format!("--sid={s}"),
-            None => "--sid=no".into(),
-        });
-    for file in &subtitle_files {
-        cmd.arg(format!("--sub-files-append={file}"));
-    }
-    if fullscreen {
-        cmd.arg("--fs");
-    }
+    cmd.args(mpv_args(&ipc, &request, &subtitle_files, wid, fullscreen));
     cmd.kill_on_drop(true);
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    let child = cmd.spawn().map_err(|e| format!("mpv could not be started: {e}"))?;
+    let child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            if let (Some(w), Some(e)) = (&window, &embedded) {
+                let _ = w.set_fullscreen(e.window_was_fullscreen);
+            }
+            return Err(format!("mpv could not be started: {e}"));
+        }
+    };
 
     let (tx, rx) = mpsc::unbounded_channel();
     // Order matters: the header must be set before the file is loaded.
@@ -190,15 +226,30 @@ pub async fn mpv_play<R: Runtime>(
         .map(|t| vec![format!("X-FreeX-Token: {t}")])
         .unwrap_or_default();
     let _ = tx.send(json!({"command": ["set_property", "http-header-fields", header]}));
-    for (n, name) in ["time-pos", "duration", "pause"].iter().enumerate() {
+    for (n, name) in OBSERVED.iter().enumerate() {
         let _ = tx.send(json!({"command": ["observe_property", n + 1, name]}));
+    }
+    if embedded.is_some() {
+        // Esc leaves full screen first and then stops (decided in `run`); older mpv versions
+        // without `keybind` just keep their default.
+        let _ = tx.send(json!({"command": ["keybind", "ESC", "script-message freex-escape"]}));
     }
     let _ = tx.send(json!({"command": ["loadfile", url.as_str()]}));
     *state.mpv.current.lock().unwrap() = Some(Running { id, commands: tx });
 
     let item_id = request.item_id.clone();
+    if embedded.is_some() {
+        mark_embedded(&app, true);
+    }
     tauri::async_runtime::spawn(async move {
-        let result = run(&app, child, &ipc, rx, &item_id).await;
+        let result = run(&app, child, &ipc, rx, &item_id, embedded.is_some()).await;
+        #[cfg(not(windows))]
+        let _ = std::fs::remove_file(&ipc);
+        if let (Some(w), Some(e)) = (app.get_webview_window("main"), embedded) {
+            mark_embedded(&app, false);
+            let _ = w.set_fullscreen(e.window_was_fullscreen);
+            let _ = w.set_focus();
+        }
         if let Some(state) = tauri::Manager::try_state::<AppState>(&app) {
             state.mpv.finished(id);
         }
@@ -207,9 +258,84 @@ pub async fn mpv_play<R: Runtime>(
     Ok(())
 }
 
+/// Properties of mpv the app follows, in the order of their observer ids.
+const OBSERVED: [&str; 4] = ["time-pos", "duration", "pause", "fullscreen"];
+
+/// State of an mpv that draws into the app window.
+struct Embedded {
+    window_was_fullscreen: bool,
+}
+
+/// The command line of mpv. Everything about the user (the sign-in token) goes over the IPC.
+fn mpv_args(
+    ipc: &str,
+    request: &PlayRequest,
+    subtitle_files: &[String],
+    wid: Option<i64>,
+    fullscreen: bool,
+) -> Vec<String> {
+    let mut args = vec![
+        format!("--input-ipc-server={ipc}"),
+        "--idle=once".into(), // quit when the file is done
+        "--force-window=immediate".into(),
+        "--keep-open=no".into(),
+        "--no-terminal".into(),
+        "--ytdl=no".into(),
+        "--hwdec=auto-safe".into(),
+        "--save-position-on-quit=no".into(), // FreeX keeps the position
+        format!("--force-media-title={}", request.title),
+        "--title=${media-title} – FreeX".into(),
+        format!("--start={:.3}", request.start_ms as f64 / 1000.0),
+        match request.audio {
+            Some(a) => format!("--aid={a}"),
+            None => "--aid=auto".into(),
+        },
+        match request.subtitle {
+            Some(s) => format!("--sid={s}"),
+            None => "--sid=no".into(),
+        },
+    ];
+    for file in subtitle_files {
+        args.push(format!("--sub-files-append={file}"));
+    }
+    if let Some(wid) = wid {
+        args.push(format!("--wid={wid}"));
+    } else if cfg!(target_os = "linux") {
+        // Groups mpv's own window with FreeX in the task bar.
+        args.push("--x11-name=freex-desktop".into());
+    }
+    if fullscreen {
+        args.push("--fs".into());
+    }
+    if cfg!(windows) {
+        // Play/pause from the keyboard's media keys and the Windows media overlay. On Linux the
+        // package recommends mpv-mpris for the same.
+        args.push("--media-controls=yes".into());
+    }
+    args
+}
+
 #[tauri::command]
 pub fn mpv_stop(state: State<'_, AppState>) {
     state.mpv.stop();
+}
+
+/// A key pressed in the app window while mpv plays inside it, in mpv's key names (`SPACE`,
+/// `Ctrl+LEFT`, `f`). mpv handles it like a key pressed in its own window.
+#[tauri::command]
+pub fn mpv_key(state: State<'_, AppState>, key: String) -> Result<(), String> {
+    if key.is_empty() || key.len() > 40 || key.chars().any(char::is_whitespace) {
+        return Err("invalid key".into());
+    }
+    state.mpv.send(json!({"command": ["keypress", key]}));
+    Ok(())
+}
+
+/// Tells the page in the main window whether mpv plays inside it (see `native.js`).
+fn mark_embedded<R: Runtime>(app: &AppHandle<R>, on: bool) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval(format!("window.__FREEX_MPV_EMBEDDED__ = {on};"));
+    }
 }
 
 #[cfg(windows)]
@@ -244,6 +370,7 @@ async fn run<R: Runtime>(
     ipc: &str,
     mut commands: mpsc::UnboundedReceiver<Value>,
     item_id: &str,
+    embedded: bool,
 ) -> MpvEvent {
     let mut event = MpvEvent {
         kind: "ended",
@@ -276,10 +403,21 @@ async fn run<R: Runtime>(
     };
     let (reader, mut writer) = tokio::io::split(stream);
     let mut lines = BufReader::new(reader).lines();
-    let _ = app.emit_to("main", EVENT, MpvEvent { kind: "started", ..event.clone() });
+    let _ = app.emit_to(
+        "main",
+        EVENT,
+        MpvEvent {
+            kind: "started",
+            ..event.clone()
+        },
+    );
 
     let mut last_emit = Instant::now() - Duration::from_secs(10);
     let mut ended_reason: Option<String> = None;
+    let mut fullscreen = false;
+    if embedded {
+        focus_embedded(app);
+    }
     loop {
         tokio::select! {
             command = commands.recv() => match command {
@@ -317,11 +455,34 @@ async fn run<R: Runtime>(
                                 event.paused = data.and_then(Value::as_bool).unwrap_or(false);
                                 last_emit = Instant::now() - Duration::from_secs(10); // report at once
                             }
+                            Some("fullscreen") => {
+                                fullscreen = data.and_then(Value::as_bool).unwrap_or(false);
+                                if embedded {
+                                    if let Some(w) = app.get_webview_window("main") {
+                                        let _ = w.set_fullscreen(fullscreen);
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                         if last_emit.elapsed() >= Duration::from_secs(1) {
                             last_emit = Instant::now();
                             let _ = app.emit_to("main", EVENT, MpvEvent { kind: "progress", ..event.clone() });
+                        }
+                    }
+                    Some("client-message") => {
+                        let args = msg.get("args").and_then(Value::as_array);
+                        if args.and_then(|a| a.first()).and_then(Value::as_str) == Some("freex-escape") {
+                            let command = if fullscreen {
+                                json!({"command": ["set_property", "fullscreen", false]})
+                            } else {
+                                json!({"command": ["quit"]})
+                            };
+                            let mut line = command.to_string();
+                            line.push('\n');
+                            if writer.write_all(line.as_bytes()).await.is_err() {
+                                break;
+                            }
                         }
                     }
                     Some("end-file") => {
@@ -339,7 +500,10 @@ async fn run<R: Runtime>(
     }
 
     // mpv quits by itself after the file (--idle=once); give it a moment, then make sure.
-    if tokio::time::timeout(Duration::from_secs(5), child.wait()).await.is_err() {
+    if tokio::time::timeout(Duration::from_secs(5), child.wait())
+        .await
+        .is_err()
+    {
         let _ = child.kill().await;
     }
     event.eof = ended_reason.as_deref() == Some("eof");
@@ -349,10 +513,68 @@ async fn run<R: Runtime>(
     event
 }
 
+/// Gives the keyboard to mpv's window inside the app window, so its keys work at once.
+#[cfg(windows)]
+fn focus_embedded<R: Runtime>(app: &AppHandle<R>) {
+    use windows::core::w;
+    use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowExW;
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(parent) = window.hwnd() else { return };
+    let parent = parent.0 as isize;
+    let _ = window.set_focus();
+    let _ = window.run_on_main_thread(move || {
+        let parent = windows::Win32::Foundation::HWND(parent as *mut _);
+        // mpv registers its window class as "mpv".
+        if let Ok(child) = unsafe { FindWindowExW(Some(parent), None, w!("mpv"), None) } {
+            let _ = unsafe { SetFocus(Some(child)) };
+        }
+    });
+}
+
+/// X11 hands the keyboard to mpv's window while the mouse is over it; the app window only
+/// needs the focus.
+#[cfg(not(windows))]
+fn focus_embedded<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::same_server;
+    use super::{mpv_args, same_server, PlayRequest};
     use tauri::Url;
+
+    fn request() -> PlayRequest {
+        PlayRequest {
+            item_id: "abc".into(),
+            url: "http://nas:32500/api/items/abc/stream".into(),
+            title: "Film".into(),
+            start_ms: 61_500,
+            token: Some("secret".into()),
+            audio: Some(2),
+            subtitle: None,
+            subtitle_files: vec![],
+        }
+    }
+
+    #[test]
+    fn the_command_line_embeds_when_asked_and_never_holds_the_token() {
+        let args = mpv_args("ipc", &request(), &[], Some(4242), true);
+        assert!(args.contains(&"--wid=4242".to_string()));
+        assert!(args.contains(&"--fs".to_string()));
+        assert!(args.contains(&"--start=61.500".to_string()));
+        assert!(args.contains(&"--aid=2".to_string()));
+        assert!(args.contains(&"--sid=no".to_string()));
+        assert!(!args.iter().any(|a| a.contains("secret")));
+        let own_window = mpv_args("ipc", &request(), &[], None, false);
+        assert!(!own_window
+            .iter()
+            .any(|a| a.starts_with("--wid") || a == "--fs"));
+    }
 
     #[test]
     fn only_streams_of_the_own_server_are_accepted() {

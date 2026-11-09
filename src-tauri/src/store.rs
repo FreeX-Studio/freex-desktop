@@ -12,9 +12,10 @@
 
 //! The app's own settings: the known servers, the player choice and the window geometry.
 //!
-//! Everything lives in one small JSON file (`settings.json`) in the app's config folder,
-//! on Windows `%APPDATA%\de.mirranet.freex.desktop`. Sign-ins are not stored here: they are
-//! kept by the web view, per server, exactly as in a browser.
+//! Everything lives in one small JSON file (`settings.json`) in the app's config folder:
+//! `%APPDATA%\de.mirranet.freex.desktop` on Windows, `~/.config/de.mirranet.freex.desktop` on
+//! Linux. Sign-ins are not stored here: they are kept by the web view, per server, exactly as
+//! in a browser.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -70,6 +71,9 @@ pub struct Settings {
     /// mpv starts in full screen.
     #[serde(default = "yes")]
     pub mpv_fullscreen: bool,
+    /// mpv plays inside the app window where the system allows it (not on Wayland).
+    #[serde(default = "yes")]
+    pub mpv_embed: bool,
     #[serde(default)]
     pub window: Option<WindowGeometry>,
 }
@@ -86,6 +90,7 @@ impl Default for Settings {
             auto_connect: true,
             player: Player::Builtin,
             mpv_fullscreen: true,
+            mpv_embed: true,
             window: None,
         }
     }
@@ -102,7 +107,9 @@ impl Settings {
 
     /// Writes the settings atomically (temporary file, then rename).
     pub fn save(&self, path: &PathBuf) {
-        let Ok(json) = serde_json::to_vec_pretty(self) else { return };
+        let Ok(json) = serde_json::to_vec_pretty(self) else {
+            return;
+        };
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -137,7 +144,7 @@ impl Settings {
             }),
         }
         self.last_server = Some(id.clone());
-        self.servers.sort_by(|a, b| b.last_used.cmp(&a.last_used));
+        self.servers.sort_by_key(|s| std::cmp::Reverse(s.last_used));
         self.server(&id).cloned().expect("just added")
     }
 

@@ -261,6 +261,28 @@ button {
     line-height: 1;
 }
 
+.confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 62px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--danger);
+    background: rgba(226, 109, 90, .08);
+}
+
+.confirm span {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--glass-ink);
+}
+
 .remove:hover {
     background: var(--raised);
     color: var(--danger);

@@ -12,6 +12,8 @@
     "allow-server-remove",
     "allow-set-auto-connect",
     "allow-desktop-info",
-    "allow-set-player"
+    "allow-set-player",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen"
   ]
 }

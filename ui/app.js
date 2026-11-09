@@ -43,6 +43,8 @@
         "This address is not valid.": "Diese Adresse ist ungültig.",
         "Remove": "Entfernen",
         "Remove {0} from the list?": "{0} aus der Liste entfernen?",
+        "Remove {0}": "{0} entfernen",
+        "Play inside the FreeX window": "Im FreeX-Fenster abspielen",
         "Found on this PC: {0}": "Auf diesem PC gefunden: {0}",
         "Last used {0}": "Zuletzt verwendet {0}",
         "The FreeX player plays in the app and converts files your PC cannot play on the server.":
@@ -148,14 +150,26 @@
 
             const remove = el("button", "remove", "×");
             remove.type = "button";
-            remove.title = t("Remove");
-            remove.setAttribute("aria-label", t("Remove"));
-            remove.addEventListener("click", async () => {
-                if (!confirm(t("Remove {0} from the list?", s.name))) return;
-                await invoke("server_remove", {id: s.id});
-                renderList();
-            });
+            remove.title = t("Remove {0}", s.name);
+            remove.setAttribute("aria-label", t("Remove {0}", s.name));
             const li = el("li");
+            // Asks in place instead of a browser dialog.
+            remove.addEventListener("click", () => {
+                const ask = el("div", "confirm");
+                ask.append(el("span", null, t("Remove {0} from the list?", s.name)));
+                const yes = el("button", "btn danger", t("Remove"));
+                yes.type = "button";
+                yes.addEventListener("click", async () => {
+                    await invoke("server_remove", {id: s.id});
+                    renderList();
+                });
+                const no = el("button", "btn", t("Cancel"));
+                no.type = "button";
+                no.addEventListener("click", () => li.replaceChildren(open, remove));
+                ask.append(yes, no);
+                li.replaceChildren(ask);
+                no.focus();
+            });
             li.append(open, remove);
             return li;
         });
@@ -187,7 +201,10 @@
         player.value = info.player;
         player.querySelector('option[value="mpv"]').disabled = !info.mpvAvailable && info.player !== "mpv";
         $("mpv-fullscreen").checked = info.mpvFullscreen;
+        $("mpv-embed").checked = info.mpvEmbed;
         $("mpv-fs-row").hidden = info.player !== "mpv";
+        // Wayland cannot show mpv inside another window; mpv then always opens its own.
+        $("mpv-embed-row").hidden = info.player !== "mpv" || !info.mpvCanEmbed;
         $("player-hint").textContent = info.player === "mpv"
             ? (info.mpvAvailable ? t("mpv plays every file directly, without conversion on the server. Skip intro and Watch Together are only available in the FreeX player.")
                 : t("mpv was not found. Reinstall FreeX Desktop or install mpv and add it to the PATH."))
@@ -203,6 +220,10 @@
         info.mpvFullscreen = e.target.checked;
         await invoke("set_player", {player: info.player, mpvFullscreen: info.mpvFullscreen});
     });
+    $("mpv-embed").addEventListener("change", async (e) => {
+        info.mpvEmbed = e.target.checked;
+        await invoke("set_player", {player: info.player, mpvEmbed: info.mpvEmbed});
+    });
     $("auto-connect").addEventListener("change", (e) => invoke("set_auto_connect", {enabled: e.target.checked}));
 
     // ------------------------------------------------------------------ start
@@ -212,7 +233,14 @@
         $("version").textContent = `${info.app} ${info.version}`;
         renderPlayer();
         const list = await renderList();
-        const picking = new URLSearchParams(location.search).has("pick");
+        const params = new URLSearchParams(location.search);
+        const picking = params.has("pick");
+        // From the tray menu: switch to this server at once.
+        const wanted = known.find((s) => s.id === params.get("connect"));
+        if (wanted) {
+            connect(wanted.url, wanted.name);
+            return;
+        }
         const last = known.find((s) => s.id === list.lastServer);
         if (!picking && list.autoConnect && last) {
             connect(last.url, last.name);

@@ -13,8 +13,8 @@
 # Builds FreeX Desktop for Windows on Linux: the app (freex-desktop.exe, cross-compiled with
 # MinGW-w64) and its installer (dist/freex-desktop-<version>-setup.exe).
 #
-#   windows/build.sh            app and installer
-#   windows/build.sh --app      only the app (dist/freex-desktop.exe)
+#   packaging/windows/build.sh            app and installer
+#   packaging/windows/build.sh --app      only the app (dist/freex-desktop.exe)
 #
 # Needs: cargo (Rust 1.90+), the Rust target x86_64-pc-windows-gnu (rustup target add
 # x86_64-pc-windows-gnu), a C compiler for Linux (build-essential: build scripts and macros run
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 DIST="$ROOT/dist"
 TARGET="x86_64-pc-windows-gnu"
 

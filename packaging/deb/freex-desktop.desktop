@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=FreeX
+GenericName=Media Player
+GenericName[de]=Medienwiedergabe
+Comment=Watch the movies and shows of your FreeX Media Server
+Comment[de]=Filme und Serien von deinem FreeX Media Server ansehen
+Exec=freex-desktop
+Icon=freex-desktop
+Terminal=false
+Categories=AudioVideo;Video;Player;TV;
+Keywords=media;movies;shows;server;stream;mpv;
+Keywords[de]=Medien;Filme;Serien;Server;Stream;mpv;
+StartupNotify=true
+StartupWMClass=freex-desktop
+SingleMainWindow=true

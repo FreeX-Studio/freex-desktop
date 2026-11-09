@@ -13,8 +13,8 @@
 fn main() {
     // Every app command gets its own permission ("allow-<command>"), so the pages of a FreeX
     // server can be granted exactly the commands they need and nothing else.
-    tauri_build::try_build(
-        tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&[
             "servers_list",
             "server_probe",
             "server_open",
@@ -25,7 +25,8 @@ fn main() {
             "show_servers",
             "mpv_play",
             "mpv_stop",
-        ])),
-    )
+            "mpv_key",
+        ]),
+    ))
     .expect("failed to run tauri-build");
 }
