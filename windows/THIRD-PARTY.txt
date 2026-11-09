@@ -29,6 +29,6 @@ Microsoft Edge WebView2 Runtime
 Tauri (https://tauri.app), MIT License or Apache License 2.0, and the Rust
 libraries it is built with, under their own (MIT, Apache 2.0, BSD, ISC, Zlib or
 Unicode) licenses. The list with all licenses is in the source repository:
-https://github.com/LinzN/freex-desktop
+https://github.com/FreeX-Studio/freex-desktop
 
 The server picker contains the font Manrope (SIL Open Font License 1.1).

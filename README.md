@@ -14,7 +14,7 @@
   <img alt="Tauri 2" src="https://img.shields.io/badge/tauri-2-ffc131">
 </p>
 
-FreeX Desktop is the Windows app for [FreeX Media Server](https://github.com/LinzN/freex-media-server). It connects
+FreeX Desktop is the Windows app for [FreeX Media Server](https://github.com/FreeX-Studio/freex-media-server). It connects
 to your server and shows FreeX Web, the interface of the server itself, in its own window – so the app always
 matches the version of the server it talks to. On top of the browser experience it adds:
 

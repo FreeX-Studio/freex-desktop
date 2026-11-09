@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "FreeX Desktop – the Windows app for FreeX Media Server"
 authors = ["MirraNET, Niklas Linz <niklas.linz@mirranet.de>"]
 license = "LGPL-3.0-only"
-repository = "https://github.com/LinzN/freex-desktop"
+repository = "https://github.com/FreeX-Studio/freex-desktop"
 edition = "2021"
 rust-version = "1.80"
 
