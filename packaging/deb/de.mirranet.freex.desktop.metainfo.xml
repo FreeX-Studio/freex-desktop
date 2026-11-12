@@ -22,8 +22,8 @@
     </ul>
   </description>
   <launchable type="desktop-id">freex-desktop.desktop</launchable>
-  <url type="homepage">https://github.com/FreeX-Studio/freex-desktop</url>
-  <url type="bugtracker">https://github.com/FreeX-Studio/freex-desktop/issues</url>
+  <url type="homepage">https://github.com/FreeX-Studio/Freex-Desktop</url>
+  <url type="bugtracker">https://github.com/FreeX-Studio/Freex-Desktop/issues</url>
   <content_rating type="oars-1.1"/>
   <categories>
     <category>AudioVideo</category>

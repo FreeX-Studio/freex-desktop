@@ -6,7 +6,7 @@ Architecture: amd64
 Maintainer: Niklas Linz <niklas.linz@mirranet.de>
 Depends: libwebkit2gtk-4.1-0 (>= 2.40), libgtk-3-0, libdbus-1-3, libayatana-appindicator3-1, mpv, libc6 (>= 2.34)
 Recommends: gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, gstreamer1.0-libav, mpv-mpris
-Homepage: https://github.com/FreeX-Studio/freex-desktop
+Homepage: https://github.com/FreeX-Studio/Freex-Desktop
 Description: FreeX Desktop - Your Media. Your Server. Your Freedom.
  The desktop app for FreeX Media Server. It connects to your server and shows
  its interface in an app window, with your servers in one place, playback of

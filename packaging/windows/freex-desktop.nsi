@@ -164,7 +164,7 @@ Section "$(SecApp)" SecApp
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\${EXE}"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-    WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/FreeX-Studio/freex-desktop"
+    WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/FreeX-Studio/Freex-Desktop"
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair" 1
 SectionEnd
