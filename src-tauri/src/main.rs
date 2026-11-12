@@ -92,6 +92,26 @@ fn main() {
     });
 }
 
+/// The engine's own user agent plus `FreeXDesktop/<version>`. FreeX Web still looks for the
+/// `Chrome/` and `Edg/` tokens on Windows (Cast button, MKV direct play), so they stay.
+fn user_agent() -> Option<String> {
+    let app = format!("FreeXDesktop/{}", env!("CARGO_PKG_VERSION"));
+    if cfg!(windows) {
+        let v = tauri::webview_version().ok()?;
+        Some(format!(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) \
+             Chrome/{v} Safari/537.36 Edg/{v} {app}"
+        ))
+    } else if cfg!(target_os = "linux") {
+        Some(format!(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) \
+             Version/17.0 Safari/605.1.15 {app}"
+        ))
+    } else {
+        None
+    }
+}
+
 fn create_main_window(app: &AppHandle) -> tauri::Result<()> {
     let nav_app = app.clone();
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
@@ -104,6 +124,12 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<()> {
         .visible(false)
         .initialization_script(NATIVE_JS)
         .zoom_hotkeys_enabled(true);
+    // Lets the server list this app by name and version under signed-in devices
+    // instead of the browser engine it runs on.
+    let builder = match user_agent() {
+        Some(ua) => builder.user_agent(&ua),
+        None => builder,
+    };
     // Windows 11 style scroll bars that only show while scrolling.
     #[cfg(windows)]
     let builder = builder.scroll_bar_style(tauri::webview::ScrollBarStyle::FluentOverlay);
