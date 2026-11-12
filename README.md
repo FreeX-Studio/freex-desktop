@@ -40,6 +40,12 @@ repository), and the planned **FreeX iOS**, **FreeX Android** and **FreeX TV**.
 `C:\Program Files\FreeX Desktop`, adds FreeX to the start menu (and, if chosen, to the desktop) and installs the
 Microsoft Edge WebView2 Runtime if it is missing (only needed on older Windows 10 installations).
 
+> [!NOTE]
+> **"Windows protected your PC" / unknown publisher:** the installer is not code-signed yet, so Microsoft Defender
+> SmartScreen warns when you start it after downloading. This is expected and not a sign of a problem with the
+> file. Click **More info** and then **Run anyway** to install. (A signed installer is planned; even then, SmartScreen
+> may warn for new versions until they have been downloaded often enough.)
+
 **Linux (Debian, Ubuntu):** install `freex-desktop_<version>_amd64.deb`:
 
 ```bash
